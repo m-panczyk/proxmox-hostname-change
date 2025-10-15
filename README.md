@@ -51,7 +51,7 @@ https://pve.proxmox.com/wiki/Renaming_a_PVE_node
 
 ```bash
 # Download the script
-wget https://raw.githubusercontent.com/yourusername/proxmox-hostname-change/main/proxmox-hostname-change.sh
+wget https://raw.githubusercontent.com/m-panczyk/proxmox-hostname-change/refs/heads/main/proxmox-hostname-change.sh
 
 # Make it executable
 chmod +x proxmox-hostname-change.sh
