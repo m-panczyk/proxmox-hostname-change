@@ -168,7 +168,7 @@ handle_vm_container_configs() {
     print_info "Handling VM and container configurations..."
     
     # Wait a moment for the new node directory to be created by pmxcfs
-    sleep 2
+    sleep 3
     
     # Check if old node directory exists
     if [[ ! -d "/etc/pve/nodes/$OLD_HOSTNAME" ]]; then
@@ -176,26 +176,53 @@ handle_vm_container_configs() {
         return
     fi
     
-    # Create new node directories if they don't exist
-    mkdir -p "/etc/pve/nodes/$NEW_HOSTNAME/qemu-server" 2>/dev/null || true
-    mkdir -p "/etc/pve/nodes/$NEW_HOSTNAME/lxc" 2>/dev/null || true
+    # Ensure new node directories exist
+    # Note: pmxcfs should create these automatically, but we verify
+    if [[ ! -d "/etc/pve/nodes/$NEW_HOSTNAME/qemu-server" ]]; then
+        print_warning "New node qemu-server directory doesn't exist yet, waiting..."
+        sleep 2
+    fi
     
-    # Move QEMU/KVM VM configurations
+    if [[ ! -d "/etc/pve/nodes/$NEW_HOSTNAME/lxc" ]]; then
+        print_warning "New node lxc directory doesn't exist yet, waiting..."
+        sleep 2
+    fi
+    
+    # Move QEMU/KVM VM configurations ONE BY ONE
+    # Note: pmxcfs doesn't support wildcard mv properly, must move individually
     if [[ -d "/etc/pve/nodes/$OLD_HOSTNAME/qemu-server" ]]; then
         local vm_count=$(ls "/etc/pve/nodes/$OLD_HOSTNAME/qemu-server/"*.conf 2>/dev/null | wc -l)
         if [[ $vm_count -gt 0 ]]; then
             print_info "Moving $vm_count VM configuration(s)..."
-            mv "/etc/pve/nodes/$OLD_HOSTNAME/qemu-server/"*.conf "/etc/pve/nodes/$NEW_HOSTNAME/qemu-server/" 2>/dev/null || true
+            for vm_conf in /etc/pve/nodes/$OLD_HOSTNAME/qemu-server/*.conf; do
+                if [[ -f "$vm_conf" ]]; then
+                    local vm_id=$(basename "$vm_conf")
+                    print_info "Moving VM config: $vm_id"
+                    mv "$vm_conf" "/etc/pve/nodes/$NEW_HOSTNAME/qemu-server/" || {
+                        print_error "Failed to move $vm_id"
+                        continue
+                    }
+                fi
+            done
             print_success "Moved VM configurations"
         fi
     fi
     
-    # Move LXC container configurations
+    # Move LXC container configurations ONE BY ONE
     if [[ -d "/etc/pve/nodes/$OLD_HOSTNAME/lxc" ]]; then
         local ct_count=$(ls "/etc/pve/nodes/$OLD_HOSTNAME/lxc/"*.conf 2>/dev/null | wc -l)
         if [[ $ct_count -gt 0 ]]; then
             print_info "Moving $ct_count container configuration(s)..."
-            mv "/etc/pve/nodes/$OLD_HOSTNAME/lxc/"*.conf "/etc/pve/nodes/$NEW_HOSTNAME/lxc/" 2>/dev/null || true
+            for ct_conf in /etc/pve/nodes/$OLD_HOSTNAME/lxc/*.conf; do
+                if [[ -f "$ct_conf" ]]; then
+                    local ct_id=$(basename "$ct_conf")
+                    print_info "Moving container config: $ct_id"
+                    mv "$ct_conf" "/etc/pve/nodes/$NEW_HOSTNAME/lxc/" || {
+                        print_error "Failed to move $ct_id"
+                        continue
+                    }
+                fi
+            done
             print_success "Moved container configurations"
         fi
     fi
